@@ -1,115 +1,193 @@
 import type { Request, Response } from "express";
-import { AuthenticatedRequest } from '../middlewares/authMiddleware';
+import { AuthenticatedRequest } from "../middlewares/authMiddleware";
 import { calculateShippingCost } from "../utils/calculateShippingCost";
-import { calculateDeliveryDate, fetchDetailedProducts, mapTransportTypeToEnum } from "../utils/shippingHelpers";
+import {
+  calculateDeliveryDate,
+  fetchDetailedProducts,
+  mapTransportTypeToEnum,
+} from "../utils/shippingHelpers";
 import Shipping from "../models/shippings";
 import ShippingLog from "../models/ShippingLog";
 import ProductItem from "../models/ProductItem";
 
-
 export class ShippingController {
-  
-static createShipping = async (req: AuthenticatedRequest, res: Response) => {
-    
-    const DEFAULT_DEPARTURE_CP = 'C1000AAA'; 
-    const authenticatedUserId = req.user?.id; 
+  static createShipping = async (req: AuthenticatedRequest, res: Response) => {
+    const DEFAULT_DEPARTURE_CP = "C1000AAA";
+    const authenticatedUserId = req.user?.id;
 
-     const { 
-        order_id, 
-        user_id, 
-        delivery_address, 
-        transport_type, 
-        products 
-    } = req.body;
+    const { order_id, user_id, delivery_address, transport_type, products } =
+      req.body;
 
-    const t = await Shipping.sequelize.transaction(); 
+    const t = await Shipping.sequelize.transaction();
 
     try {
-        // Validación de Seguridad 
-        if (!authenticatedUserId || authenticatedUserId !== user_id) {
-            await t.rollback();
-            return res.status(403).json({ success: false, message: 'Acceso denegado. ID de usuario no coincide.' });
-        }
-    
-        //  Integración 
-        const detailedProducts = await fetchDetailedProducts(products); 
-        const transportTypeEnum = mapTransportTypeToEnum(transport_type); 
-        const estimatedDeliveryAt = calculateDeliveryDate(transport_type);
-        const finalShippingCost = calculateShippingCost(detailedProducts);
+      // Validación de Seguridad
+      if (!authenticatedUserId || authenticatedUserId !== user_id) {
+        await t.rollback();
+        return res
+          .status(403)
+          .json({
+            success: false,
+            message: "Acceso denegado. ID de usuario no coincide.",
+          });
+      }
 
-        //  Crear el registro de envío 
-        const shipping = await Shipping.create({
-            user_id: authenticatedUserId, 
-            order_id: order_id, 
-            status: 'created', 
-            shipping_cost: finalShippingCost,
-            products: detailedProducts, 
+      //  Integración
+      const detailedProducts = await fetchDetailedProducts(products);
+      const transportTypeEnum = mapTransportTypeToEnum(transport_type);
+      const estimatedDeliveryAt = calculateDeliveryDate(transport_type);
+      const finalShippingCost = calculateShippingCost(detailedProducts);
 
-            delivery_address_json: delivery_address, 
+      //  Crear el registro de envío
+      const shipping = await Shipping.create(
+        {
+          user_id: authenticatedUserId,
+          order_id: order_id,
+          status: "created",
+          shipping_cost: finalShippingCost,
+          products: detailedProducts,
 
-            transport_type: transportTypeEnum,
-            departure_postal_code: DEFAULT_DEPARTURE_CP,
-            estimated_delivery_at: estimatedDeliveryAt,
-        }, { transaction: t });
+          delivery_address_json: delivery_address,
 
-        //  Crear el primer log de seguimiento
-        await ShippingLog.create({
-            shipping_id: shipping.id,
-            status: 'created',
-            message: 'Envío creado y pendiente de recolección.',
-            timestamp: new Date(), 
-        }, { transaction: t });
-        
-        await t.commit(); 
+          transport_type: transportTypeEnum,
+          departure_postal_code: DEFAULT_DEPARTURE_CP,
+          estimated_delivery_at: estimatedDeliveryAt,
+        },
+        { transaction: t }
+      );
 
-        return res.status(201).json({ 
-            success: true, 
-            message: 'Envío registrado exitosamente.',
-            data: { shipping_id: shipping.id }
-        });
+      //  Crear el primer log de seguimiento
+      await ShippingLog.create(
+        {
+          shipping_id: shipping.id,
+          status: "created",
+          message: "Envío creado y pendiente de recolección.",
+          timestamp: new Date(),
+        },
+        { transaction: t }
+      );
 
+      await t.commit();
+
+      return res.status(201).json({
+        success: true,
+        message: "Envío registrado exitosamente.",
+        data: { shipping_id: shipping.id },
+      });
     } catch (error: any) {
-        await t.rollback(); 
-        console.error('Error en createShipping:', error);
+      await t.rollback();
+      console.error("Error en createShipping:", error);
 
-        const errorMessage = error.errors ? error.errors.map((e: any) => e.message).join(', ') : (error.message.includes('Stock') ? error.message : 'Error interno al procesar el envío.');
+      const errorMessage = error.errors
+        ? error.errors.map((e: any) => e.message).join(", ")
+        : error.message.includes("Stock")
+        ? error.message
+        : "Error interno al procesar el envío.";
 
-        return res.status(500).json({ 
-            success: false, 
-            message: 'Falló la creación del envío o la reserva de stock.', 
-            error: errorMessage 
-        });
+      return res.status(500).json({
+        success: false,
+        message: "Falló la creación del envío o la reserva de stock.",
+        error: errorMessage,
+      });
     }
-};
+  };
 
   static getShippingById = async (req: AuthenticatedRequest, res: Response) => {
     try {
-        const { id } = req.params;
-        const authenticatedUserId = req.user?.id;  
+      const { id } = req.params;
+      const authenticatedUserId = req.user?.id;
 
-        const shipping = await Shipping.findByPk(id, {
-            
-            include: [
-                { 
-                    model: ShippingLog, 
-                    as: 'logs', 
-                    order: [['createdAt', 'ASC']] 
-                }
-            ]
-        });
+      const shipping = await Shipping.findByPk(id, {
+        include: [
+          {
+            model: ShippingLog,
+            as: "logs",
+            order: [["createdAt", "ASC"]],
+          },
+        ],
+      });
 
-        if (!shipping) {
-           
-            return res.status(404).json({ success: false, message: 'Envío no encontrado.' });
-        }
-       
-        return res.status(200).json({ success: true, data: shipping });
+      if (!shipping) {
+        return res
+          .status(404)
+          .json({ success: false, message: "Envío no encontrado." });
+      }
 
+      return res.status(200).json({ success: true, data: shipping });
     } catch (error) {
-        console.error("Error al obtener el envío:", error);
-        return res.status(500).json({ success: false, message: "Error interno del servidor al obtener el detalle." });
+      console.error("Error al obtener el envío:", error);
+      return res
+        .status(500)
+        .json({
+          success: false,
+          message: "Error interno del servidor al obtener el detalle.",
+        });
     }
-}
+  };
+
+  static updateShippingStatus = async (
+    req: AuthenticatedRequest,
+    res: Response
+  ) => {
+    const { id: shipping_id } = req.params;
+    const { status, message } = req.body;
+    const authenticatedUserId = req.user?.id;
+
+    const t = await Shipping.sequelize.transaction();
+
+    try {
+      if (!status || !message) {
+        await t.rollback();
+        return res
+          .status(400)
+          .json({
+            success: false,
+            message: "Faltan los campos status y message.",
+          });
+      }
+
+      //  Buscar Envío
+      const shipping = await Shipping.findByPk(shipping_id, { transaction: t });
+
+      if (!shipping) {
+        await t.rollback();
+        return res
+          .status(404)
+          .json({ success: false, message: "Envío no encontrado." });
+      }
+
+      // Actualizar el Estado del Envío
+      await shipping.update({ status: status }, { transaction: t });
+
+      // Crear el Log de Seguimiento
+      await ShippingLog.create(
+        {
+          shipping_id: shipping.id,
+          status: status,
+          message: message,
+          timestamp: new Date(),
+        },
+        { transaction: t }
+      );
+
+      await t.commit();
+
+      return res.status(200).json({
+        success: true,
+        message: `Estado de envío ${shipping_id} actualizado a ${status}.`,
+        new_status: status,
+      });
+    } catch (error) {
+      await t.rollback();
+      console.error("Error al actualizar estado:", error);
+      return res
+        .status(500)
+        .json({
+          success: false,
+          message: "Error interno al actualizar el estado.",
+        });
+    }
+  };
 
   static getShippingsByUser = async (req: Request, res: Response) => {
     try {
@@ -128,9 +206,7 @@ static createShipping = async (req: AuthenticatedRequest, res: Response) => {
     }
   };
 
-  static calculateCost = async (req: Request, res: Response) => {
-   
-  };
+  static calculateCost = async (req: Request, res: Response) => {};
 
   static getShippingStatuses = (req: Request, res: Response) => {
     try {
@@ -146,45 +222,6 @@ static createShipping = async (req: AuthenticatedRequest, res: Response) => {
       res.json({ statuses });
     } catch (error) {
       console.error("Error en getShippingStatuses:", error);
-      res.status(500).json({ error: "Error interno del servidor" });
-    }
-  };
-
-  static updateShippingStatus = async (req: Request, res: Response) => {
-    try {
-      const { id } = req.params;
-      const { status, message } = req.body;
-
-      const validStatuses = [
-        "created",
-        "distribution",
-        "in_transit",
-        "delivered",
-        "returned",
-        "cancelled",
-      ];
-
-      if (!validStatuses.includes(status)) {
-        return res.status(400).json({ error: "Estado inválido" });
-      }
-
-      const shipping = await Shipping.findByPk(id);
-      if (!shipping)
-        return res.status(404).json({ error: "Envío no encontrado" });
-
-      shipping.status = status;
-      await shipping.save();
-
-      await ShippingLog.create({
-        shipping_id: shipping.id,
-        status,
-        message: message || `Estado actualizado a ${status}`,
-        timestamp: new Date(),
-      });
-
-      res.json({ message: "Estado actualizado correctamente", status });
-    } catch (error) {
-      console.error("Error al actualizar estado:", error);
       res.status(500).json({ error: "Error interno del servidor" });
     }
   };
