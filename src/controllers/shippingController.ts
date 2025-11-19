@@ -254,21 +254,29 @@ export class ShippingController {
     }
 }
 
-  static getShippingStatuses = (req: Request, res: Response) => {
+  static getShippingStatuses = (req: Request, res: Response): Response => {
     try {
-      const statuses = [
-        "created",
-        "distribution",
-        "in_transit",
-        "delivered",
-        "returned",
-        "cancelled",
-      ];
+        
+        const statuses = [
+            'created',
+            'reserved',
+            'in_transit',
+            'in_distribution',
+            'arrived',
+            'delivered',
+            'cancelled',
+        ];
 
-      res.json({ statuses });
+        return res.status(200).json({ 
+            success: true, 
+            data: statuses 
+        });
     } catch (error) {
-      console.error("Error en getShippingStatuses:", error);
-      res.status(500).json({ error: "Error interno del servidor" });
+        console.error("Error en getShippingStatuses:", error);
+        return res.status(500).json({ 
+            success: false, 
+            message: "Error interno del servidor al obtener estados." 
+        });
     }
-  };
+}
 }
