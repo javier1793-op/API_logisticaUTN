@@ -35,15 +35,16 @@ static createShipping = async (req: AuthenticatedRequest, res: Response) => {
         const detailedProducts = await fetchDetailedProducts(products); 
         const transportTypeEnum = mapTransportTypeToEnum(transport_type); 
         const estimatedDeliveryAt = calculateDeliveryDate(transport_type);
+        const finalShippingCost = calculateShippingCost(detailedProducts);
 
         //  Crear el registro de envío 
         const shipping = await Shipping.create({
             user_id: authenticatedUserId, 
             order_id: order_id, 
             status: 'created', 
+            shipping_cost: finalShippingCost,
             products: detailedProducts, 
-            
-           
+
             delivery_address_json: delivery_address, 
 
             transport_type: transportTypeEnum,
@@ -81,24 +82,34 @@ static createShipping = async (req: AuthenticatedRequest, res: Response) => {
     }
 };
 
-  static getShippingById = async (req: Request, res: Response) => {
+  static getShippingById = async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const { id } = req.params;
+        const { id } = req.params;
+        const authenticatedUserId = req.user?.id;  
 
-      const shipping = await Shipping.findByPk(id, {
-        include: [ProductItem, ShippingLog],
-      });
+        const shipping = await Shipping.findByPk(id, {
+            
+            include: [
+                { 
+                    model: ShippingLog, 
+                    as: 'logs', 
+                    order: [['createdAt', 'ASC']] 
+                }
+            ]
+        });
 
-      if (!shipping) {
-        return res.status(404).json({ error: "Envío no encontrado" });
-      }
+        if (!shipping) {
+           
+            return res.status(404).json({ success: false, message: 'Envío no encontrado.' });
+        }
+       
+        return res.status(200).json({ success: true, data: shipping });
 
-      res.json(shipping);
     } catch (error) {
-      console.error("Error al obtener el envío:", error);
-      res.status(500).json({ error: "Error interno del servidor" });
+        console.error("Error al obtener el envío:", error);
+        return res.status(500).json({ success: false, message: "Error interno del servidor al obtener el detalle." });
     }
-  };
+}
 
   static getShippingsByUser = async (req: Request, res: Response) => {
     try {
@@ -118,32 +129,7 @@ static createShipping = async (req: AuthenticatedRequest, res: Response) => {
   };
 
   static calculateCost = async (req: Request, res: Response) => {
-    try {
-      const { transport_type, products } = req.body;
-
-      const cost = calculateShippingCost(transport_type, products);
-
-      res.json({ cost });
-    } catch (error) {
-      console.error("Error al calcular el costo:", error);
-      res.status(500).json({ error: "Error interno del servidor" });
-    }
-  };
-
-  static getShippingLogs = async (req: Request, res: Response) => {
-    try {
-      const { id: shipping_id } = req.params;
-
-      const logs = await ShippingLog.findAll({
-        where: { shipping_id },
-        order: [["timestamp", "ASC"]],
-      });
-
-      res.json(logs);
-    } catch (error) {
-      console.error("Error al obtener los logs:", error);
-      res.status(500).json({ error: "Error interno del servidor" });
-    }
+   
   };
 
   static getShippingStatuses = (req: Request, res: Response) => {

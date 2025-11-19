@@ -50,6 +50,10 @@ class Shipping extends Model {
   @Column(DataType.DATE)
   declare estimated_delivery_at: Date;
 
+  @AllowNull(true)
+  @Column(DataType.FLOAT)
+  declare shipping_cost?: number;
+
   @Column(DataType.DATE)
   declare cancelled_at?: Date;
 

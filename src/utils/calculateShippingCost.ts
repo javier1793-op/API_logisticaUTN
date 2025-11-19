@@ -1,36 +1,32 @@
-export const calculateShippingCost = (
-  transport_type: string,
-  products: {
-    quantity: number;
-    weight: number;
-    length: number;
+interface ProductDetail {
+  id: string;
+  quantity: number;
+  weight_kg: number;
+  dimensions_cm: {
     width: number;
     height: number;
-  }[]
-): number => {
-  let baseRate = 0;
+    length: number;
+  };
+}
 
-  switch (transport_type) {
-    case 'air':
-      baseRate = 10;
-      break;
-    case 'sea':
-      baseRate = 5;
-      break;
-    case 'rail':
-      baseRate = 7;
-      break;
-    case 'road':
-      baseRate = 8;
-      break;
-  }
 
-  const total = products.reduce((acc, item) => {
-    const volume = item.length * item.width * item.height;
-    const weightFactor = item.weight * 0.5;
-    const itemCost = (volume * 0.01 + weightFactor) * item.quantity;
-    return acc + itemCost;
-  }, 0);
+export const calculateShippingCost = (products: ProductDetail[]): number => {
+  
+  // Calcular la cantidad total de artículos
+  const totalQuantity = products.reduce((sum, product) => sum + product.quantity, 0);
 
-  return Math.round(total * baseRate * 100) / 100;
+  //  Definir un precio base simulado por artículo
+  const BASE_PRICE_PER_ITEM = 500; 
+  const IVA_RATE = 0.21; 
+
+  // costo base
+  const baseCost = totalQuantity * BASE_PRICE_PER_ITEM;
+
+  // IVA
+  const taxAmount = baseCost * IVA_RATE;
+
+  // total
+  const totalCost = baseCost + taxAmount;
+
+  return parseFloat(totalCost.toFixed(2));
 };

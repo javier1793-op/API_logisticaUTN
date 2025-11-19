@@ -20,7 +20,6 @@ router.get("/users/:id/", isAuthenticated, ShippingController.getShippingsByUser
 router.post("/cost", validateShippingInput, ShippingController.calculateCost);
 // 6. LISTADO DE ESTADOS VÁLIDOS
 router.get("/statuses", ShippingController.getShippingStatuses);
-// 7. OBTENER LOGS DE UN ENVÍO ESPECÍFICO
-router.get("/:id/logs", ShippingController.getShippingLogs);
+
 
 export default router;
