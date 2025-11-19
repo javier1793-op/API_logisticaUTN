@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { ShippingController } from "../controllers/shippingController";
-import { validateShippingInput } from "../middlewares/validateShippingInput";
+import { validateShippingCost } from "../middlewares/validateShippingInput";
 import { isAuthenticated } from "../middlewares/authMiddleware"
 
 const router = Router();
@@ -17,7 +17,7 @@ router.get("/users/:id/", isAuthenticated, ShippingController.getShippingsByUser
 
 // RUTAS PÚBLICAS O DE BAJO RIESGO (No requieren Token)
 // 5. COTIZACIÓN
-router.post("/cost", validateShippingInput, ShippingController.calculateCost);
+router.post("/cost", validateShippingCost, ShippingController.calculateCost);
 // 6. LISTADO DE ESTADOS VÁLIDOS
 router.get("/statuses", ShippingController.getShippingStatuses);
 

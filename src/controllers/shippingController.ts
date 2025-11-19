@@ -8,7 +8,13 @@ import {
 } from "../utils/shippingHelpers";
 import Shipping from "../models/shippings";
 import ShippingLog from "../models/ShippingLog";
-import ProductItem from "../models/ProductItem";
+
+interface ProductDetail {
+    id: string;
+    quantity: number;
+    weight_kg: number;
+    dimensions_cm: { width: number; height: number; length: number; };
+}
 
 export class ShippingController {
   static createShipping = async (req: AuthenticatedRequest, res: Response) => {
@@ -189,24 +195,64 @@ export class ShippingController {
     }
   };
 
-  static getShippingsByUser = async (req: Request, res: Response) => {
+  static getShippingsByUser = async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const { id: user_id } = req.params;
+        const { id: requestedUserId } = req.params; 
+        const authenticatedUserId = req.user?.id;  
 
-      const shippings = await Shipping.findAll({
-        where: { user_id },
-        include: [ProductItem, ShippingLog],
-        order: [["createdAt", "DESC"]],
-      });
+       if (authenticatedUserId !== parseInt(requestedUserId as string)) {
+             return res.status(403).json({ success: false, message: 'No autorizado para ver el historial de otro usuario.' });
+        }
 
-      res.json(shippings);
+        // Consulta con filtro e inclusión
+        const shippings = await Shipping.findAll({
+            where: { user_id: requestedUserId }, 
+            order: [['createdAt', 'DESC']],
+          
+            include: [
+                { model: ShippingLog, as: 'logs' }, 
+            ]
+        });
+
+        if (!shippings || shippings.length === 0) {
+            return res.status(200).json({ success: true, message: 'No se encontraron envíos para este usuario.', data: [] });
+        }
+
+        return res.status(200).json({ success: true, data: shippings });
+
     } catch (error) {
-      console.error("Error al obtener los envíos del usuario:", error);
-      res.status(500).json({ error: "Error interno del servidor" });
+        console.error("Error al obtener los envíos del usuario:", error);
+        return res.status(500).json({ success: false, message: "Error interno del servidor al obtener el historial." });
     }
-  };
+}
 
-  static calculateCost = async (req: Request, res: Response) => {};
+  static calculateCost = async (req: Request, res: Response): Promise<Response> => {
+    try {
+       
+        const { transportMethod, products } = req.body; 
+
+        //  Obtener el costo total del envío
+        const cost = calculateShippingCost(products as ProductDetail[]); 
+        
+        // Simular los días estimados (basado en el método de transporte)
+        const estimatedDays = transportMethod === 'express' ? 2 : 5; 
+        
+        return res.status(200).json({
+            success: true,
+            cost,
+            currency: "PESOS", 
+            estimated_days: estimatedDays,
+        });
+
+    } catch (error) {
+        console.error("Error al calcular el costo:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Error al calcular el costo de envío",
+            error: (error as Error).message,
+        });
+    }
+}
 
   static getShippingStatuses = (req: Request, res: Response) => {
     try {
