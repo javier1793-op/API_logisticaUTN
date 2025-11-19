@@ -15,7 +15,7 @@ export async function connectDB() {
     }
 }
 
-connectDB()
+
 
 const app = express()
 
