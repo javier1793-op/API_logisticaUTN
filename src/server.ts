@@ -8,7 +8,7 @@ import userRouter from './routes/authRouter'
 export async function connectDB() {
     try {
         await db.authenticate()
-        db.sync()
+        await db.sync()
         console.log( colors.blue.bold('Conexión exitosa a la BD'))
     } catch (error) {
         console.log( colors.red.bold('Fallo en conexión a la BD'))
