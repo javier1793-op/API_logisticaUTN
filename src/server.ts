@@ -23,7 +23,7 @@ app.use(morgan('dev'))
 
 app.use(express.json())
 
-app.use('/api/shippings',shippingRouter)
+app.use('/api/logistics',shippingRouter)
 app.use('/api/auth',userRouter)
 
 export default app
