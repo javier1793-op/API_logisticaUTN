@@ -7,7 +7,7 @@ export const db = new Sequelize(process.env.DATABASE_URL, {
   logging: false,
   dialectOptions: {
     ssl: {
-      require: true,
+      require: false,
       rejectUnauthorized: false
     }
   }
