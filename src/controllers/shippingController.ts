@@ -1,51 +1,85 @@
 import type { Request, Response } from "express";
+import { AuthenticatedRequest } from '../middlewares/authMiddleware';
+import { calculateShippingCost } from "../utils/calculateShippingCost";
+import { calculateDeliveryDate, fetchDetailedProducts, mapTransportTypeToEnum } from "../utils/shippingHelpers";
 import Shipping from "../models/shippings";
 import ShippingLog from "../models/ShippingLog";
 import ProductItem from "../models/ProductItem";
-import { calculateShippingCost } from "../utils/calculateShippingCost";
+
 
 export class ShippingController {
-  static createShipping = async (req: Request, res: Response) => {
+  
+static createShipping = async (req: AuthenticatedRequest, res: Response) => {
+    
+    const DEFAULT_DEPARTURE_CP = 'C1000AAA'; 
+    const authenticatedUserId = req.user?.id; 
+
+     const { 
+        order_id, 
+        user_id, 
+        delivery_address, 
+        transport_type, 
+        products 
+    } = req.body;
+
+    const t = await Shipping.sequelize.transaction(); 
+
     try {
-      const {
-        user_id,
-        transport_type,
-        departure_postal_code,
-        estimated_delivery_at,
-        products,
-      } = req.body;
+        // Validación de Seguridad 
+        if (!authenticatedUserId || authenticatedUserId !== user_id) {
+            await t.rollback();
+            return res.status(403).json({ success: false, message: 'Acceso denegado. ID de usuario no coincide.' });
+        }
+    
+        //  Integración 
+        const detailedProducts = await fetchDetailedProducts(products); 
+        const transportTypeEnum = mapTransportTypeToEnum(transport_type); 
+        const estimatedDeliveryAt = calculateDeliveryDate(transport_type);
 
-      const shipping = await Shipping.create({
-        user_id,
-        transport_type,
-        departure_postal_code,
-        estimated_delivery_at,
-        status: "created",
-      });
+        //  Crear el registro de envío 
+        const shipping = await Shipping.create({
+            user_id: authenticatedUserId, 
+            order_id: order_id, 
+            status: 'created', 
+            products: detailedProducts, 
+            
+           
+            delivery_address_json: delivery_address, 
 
-      await Promise.all(
-        products.map((item) =>
-          ProductItem.create({
-            ...item,
+            transport_type: transportTypeEnum,
+            departure_postal_code: DEFAULT_DEPARTURE_CP,
+            estimated_delivery_at: estimatedDeliveryAt,
+        }, { transaction: t });
+
+        //  Crear el primer log de seguimiento
+        await ShippingLog.create({
             shipping_id: shipping.id,
-          })
-        )
-      );
+            status: 'created',
+            message: 'Envío creado y pendiente de recolección.',
+            timestamp: new Date(), 
+        }, { transaction: t });
+        
+        await t.commit(); 
 
-      await ShippingLog.create({
-        shipping_id: shipping.id,
-        timestamp: new Date(),
-        status: "created",
-        message: "Envío creado exitosamente",
-      });
+        return res.status(201).json({ 
+            success: true, 
+            message: 'Envío registrado exitosamente.',
+            data: { shipping_id: shipping.id }
+        });
 
-      return res.status(201).json({ shipping_id: shipping.id });
-    } catch (error) {
-      console.error("Error al crear el envío:", error);
-      const err = new Error("Hubo un error");
-      return res.status(500).json({ error: err.message });
+    } catch (error: any) {
+        await t.rollback(); 
+        console.error('Error en createShipping:', error);
+
+        const errorMessage = error.errors ? error.errors.map((e: any) => e.message).join(', ') : (error.message.includes('Stock') ? error.message : 'Error interno al procesar el envío.');
+
+        return res.status(500).json({ 
+            success: false, 
+            message: 'Falló la creación del envío o la reserva de stock.', 
+            error: errorMessage 
+        });
     }
-  };
+};
 
   static getShippingById = async (req: Request, res: Response) => {
     try {

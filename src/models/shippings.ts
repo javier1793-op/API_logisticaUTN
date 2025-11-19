@@ -8,12 +8,12 @@ import {
   ForeignKey,
   HasMany,
   BelongsTo,
-} from 'sequelize-typescript';
-import ProductItem from './ProductItem';
-import ShippingLog from './ShippingLog';
-import User from './User';
+} from "sequelize-typescript";
+import ProductItem from "./ProductItem";
+import ShippingLog from "./ShippingLog";
+import User from "./User";
 
-@Table({ tableName: 'shippings' })
+@Table({ tableName: "shippings" })
 class Shipping extends Model {
   @ForeignKey(() => User)
   @AllowNull(false)
@@ -24,22 +24,22 @@ class Shipping extends Model {
   declare user: User;
 
   @AllowNull(false)
-  @Default('created')
+  @Default("created")
   @Column(
     DataType.ENUM(
-      'created',
-      'reserved',
-      'in_transit',
-      'delivered',
-      'cancelled',
-      'in_distribution',
-      'arrived'
+      "created",
+      "reserved",
+      "in_transit",
+      "delivered",
+      "cancelled",
+      "in_distribution",
+      "arrived"
     )
   )
   declare status: string;
 
   @AllowNull(false)
-  @Column(DataType.ENUM('air', 'sea', 'rail', 'road'))
+  @Column(DataType.ENUM("air", "sea", "rail", "road"))
   declare transport_type: string;
 
   @AllowNull(false)
@@ -53,15 +53,19 @@ class Shipping extends Model {
   @Column(DataType.DATE)
   declare cancelled_at?: Date;
 
+  @AllowNull(false)
+  @Column(DataType.JSONB)
+  declare delivery_address_json: any;
+
   @HasMany(() => ProductItem, {
-    onUpdate: 'CASCADE',
-    onDelete: 'CASCADE',
+    onUpdate: "CASCADE",
+    onDelete: "CASCADE",
   })
   declare products: ProductItem[];
 
   @HasMany(() => ShippingLog, {
-    onUpdate: 'CASCADE',
-    onDelete: 'CASCADE',
+    onUpdate: "CASCADE",
+    onDelete: "CASCADE",
   })
   declare logs: ShippingLog[];
 }

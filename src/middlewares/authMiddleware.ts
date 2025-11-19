@@ -14,18 +14,13 @@ export const isAuthenticated = (req: AuthenticatedRequest, res: Response, next: 
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-
         return res.status(401).json({ message: 'Acceso denegado. Token no proporcionado.' });
     }
-    
-     const token = authHeader.split(' ')[1];
-
+         const token = authHeader.split(' ')[1];
     try {
           const decoded = jwt.verify(token, JWT_SECRET) as { id: number; email: string; role: string; };
-        
-        req.user = decoded; 
+               req.user = decoded; 
         next(); 
-
     } catch (error) {
         return res.status(401).json({ message: 'Token inválido o expirado.' });
     }

@@ -17,9 +17,7 @@ class ShippingLog extends Model {
   @Column(DataType.INTEGER)
   declare shipping_id: number;
 
-  @AllowNull(false)
-  @Column(DataType.DATE)
-  declare timestamp: Date;
+
 
   @AllowNull(false)
   @Column(
