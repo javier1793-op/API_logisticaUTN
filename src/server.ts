@@ -4,6 +4,7 @@ import morgan from 'morgan'
 import { db } from './config/db'
 import shippingRouter from './routes/shippingRoutes'
 import userRouter from './routes/authRouter'
+import cors from 'cors';
 
 export async function connectDB() {
     try {
@@ -19,6 +20,7 @@ export async function connectDB() {
 
 
 const app = express()
+app.use(cors());
 
 app.use(morgan('dev'))
 
